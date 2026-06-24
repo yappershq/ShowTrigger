@@ -15,9 +15,10 @@ When you turn it on it reminds you to run **`cl_debug_overlays_broadcast 1`** in
 that client cvar is what actually renders the broadcast overlays, and it can't be forced from the
 server (see Mechanism).
 
-The overlays drawn are: trigger **name** + **bounding box** + the engine's dedicated **trigger
-bounds** overlay (`0x2 | 0x4 | 0x2000`). Tune `TriggerOverlayBits` in
-[`ShowTriggerModule.cs`](ShowTrigger/Modules/ShowTriggerModule.cs) if you want fewer.
+The overlay drawn is `OVERLAY_TRIGGER_BOUNDS_BIT` (`0x2000`) — the exact bit the engine's own
+`showtriggers` uses (verified in the disassembly). OR in `OVERLAY_NAME_BIT` (`0x2`) via
+`TriggerOverlayBits` in [`ShowTriggerModule.cs`](ShowTrigger/Modules/ShowTriggerModule.cs) if you
+also want trigger names drawn.
 
 ## How it works (short)
 

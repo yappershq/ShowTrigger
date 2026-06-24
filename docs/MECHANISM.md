@@ -23,8 +23,14 @@ forced from the server**, which is why the toggle instructs the player to set it
    `trigger_` as it spawns (and drops it on delete). The list is cleared per map.
 2. **Enable broadcast.** On `OnServerActivate` it runs `sv_debug_overlays_broadcast 1`.
 3. **Toggle.** `!showtriggers` flips a per-player flag. While ≥1 player wants triggers shown, the
-   plugin calls `AddDebugOverlayBits(trigger, NAME|BBOX|TRIGGER_BOUNDS)` on every tracked trigger;
-   when the last player turns it off it calls `RemoveDebugOverlayBits` with the same bits.
+   plugin calls `AddDebugOverlayBits(trigger, 0x2000)` on every tracked trigger; when the last
+   player turns it off it calls `RemoveDebugOverlayBits` with the same bit.
+
+   `0x2000` is `OVERLAY_TRIGGER_BOUNDS_BIT` — the **exact** value the engine's own CMD_ShowTriggers
+   uses, verified in the disassembly (`mov $0x2000,%esi` immediately before the Add/Remove call).
+   Note CS:GO (Source 1) did this differently — its `showtriggers_toggle` toggled `EF_NODRAW` to
+   render the brush directly; Source 2 reworked it onto the debug-overlay path used here. You can OR
+   in `OVERLAY_NAME_BIT` (0x2) if you also want trigger names drawn.
 
 The two functions take `(CBaseEntity* entity, uint64 bits)` and edit the entity's overlay set —
 which in the current build is a `CUtlHashMap` at `entity + 0x160`, **not** a plain integer field

@@ -23,10 +23,10 @@ namespace ShowTrigger.Modules;
 /// </summary>
 internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClientListener, IGameListener
 {
-    // OVERLAY_NAME_BIT (0x2) + OVERLAY_BBOX_BIT (0x4) + OVERLAY_TRIGGER_BOUNDS_BIT (0x2000):
-    // name label, AABB box, and the dedicated trigger-bounds overlay the engine's own
-    // `showtriggers` uses. Tune here if you want fewer overlays.
-    private const ulong TriggerOverlayBits = 0x2UL | 0x4UL | 0x2000UL;
+    // OVERLAY_TRIGGER_BOUNDS_BIT (0x2000) — the EXACT value the engine's own CMD_ShowTriggers
+    // passes (verified in libserver disasm: `mov $0x2000,%esi` right before the Add/Remove call).
+    // OR in OVERLAY_NAME_BIT (0x2) here if you also want the trigger's name drawn.
+    private const ulong TriggerOverlayBits = 0x2000UL;
 
     // The two engine functions are resolved as the `call` (E8) targets inside CMD_ShowTriggers.
     // These byte offsets match the current build (verified by RE); the opcode is asserted at load,
