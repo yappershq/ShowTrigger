@@ -23,43 +23,39 @@ forced from the server**, which is why the toggle instructs the player to set it
    `trigger_` as it spawns (and drops it on delete). The list is cleared per map.
 2. **Enable broadcast.** On `OnServerActivate` it runs `sv_debug_overlays_broadcast 1`.
 3. **Toggle.** `!showtriggers` flips a per-player flag. While ≥1 player wants triggers shown, the
-   plugin calls `AddDebugOverlayBits` on every tracked trigger, picking the bit per trigger
-   (`OverlayBitsFor`); when the last player turns it off it calls `RemoveDebugOverlayBits` for both
-   bits.
+   plugin calls `AddDebugOverlayBits(trigger, 0x4 | 0x2)` on every tracked trigger; when the last
+   player turns it off it calls `RemoveDebugOverlayBits`.
 
-   - A **VPhysics** trigger (has a real vcollide mesh) gets `OVERLAY_TRIGGER_BOUNDS_BIT` (0x2000) —
-     the exact brush outline, the same bit the engine's own `showtriggers` uses.
-   - A **bbox / point** trigger (no mesh) gets `OVERLAY_BBOX_BIT` (0x4) — the AABB box — because
-     TriggerBounds would crash the server on a mesh-less trigger (see Crash safety below).
+   `0x4` is `OVERLAY_BBOX_BIT` (the trigger's AABB box) and `0x2` is `OVERLAY_NAME_BIT` (its name).
+   The engine's own `showtriggers` uses `OVERLAY_TRIGGER_BOUNDS_BIT` (0x2000) instead, but that bit
+   crashes the server when broadcast to a client (see Crash safety below), so this plugin uses BBOX
+   for every trigger. Note CS:GO (Source 1) did this differently again — its `showtriggers_toggle`
+   toggled `EF_NODRAW` to render the brush directly; Source 2 reworked it onto the debug-overlay path
+   used here.
 
-   Both also OR in `OVERLAY_NAME_BIT` (0x2) for the label. Note CS:GO (Source 1) did this differently
-   again — its `showtriggers_toggle` toggled `EF_NODRAW` to render the brush directly; Source 2
-   reworked it onto the debug-overlay path used here.
+## Crash safety — use BBOX, never TriggerBounds
 
-## Crash safety — TriggerBounds only on triggers that actually have a mesh
-
-Setting `OVERLAY_TRIGGER_BOUNDS_BIT` (0x2000) on a **mesh-less** trigger crashes the server
-(`SIGSEGV`) once the overlays are broadcast to a connected client. RE of a crashdump: the trigger's
+Setting `OVERLAY_TRIGGER_BOUNDS_BIT` (0x2000) on a trigger crashes the server (`SIGSEGV`) once the
+overlays are broadcast to a connected client. RE of a crashdump: the trigger's
 `DrawDebugGeometryOverlays` (vtable[0x20], `FUN_01583a80`) routes through the engine overlay
-manager's `+0x430` method, which serializes the trigger's first collision-shape **mesh** vertices
-into the per-client overlay net-buffer. A `SOLID_BBOX`/point trigger still has a collision-shape
-entry but **no mesh**, so the engine reads a garbage vertex count and the copy runs with a NULL
-source and a negative size (dump: `rsi=0, rdx=0xfffffffffffffb80` = `-24 * 0x30`) → crash, every
-frame, while broadcasting. (Empty servers don't reproduce it — the crash is in the client-broadcast
-serialization.)
+manager's `+0x430` method, which serializes the trigger's collision-shape **mesh** vertices into the
+per-client overlay net-buffer. That serializer is broken for triggers in this CS2 build — it reads a
+garbage vertex count and the copy runs with a NULL source and a negative size (dump:
+`rsi=0, rdx=0xfffffffffffffb80` = `-24 * 0x30`) → crash, every frame, while broadcasting. (Empty
+servers don't reproduce it — the crash is in the client-broadcast serialization.)
 
-The discriminator is therefore **whether the trigger's collision shape has a real mesh**, which is
-exactly `SolidType.VPhysics` (a vcollide). So `OverlayBitsFor` gives:
+It was tempting to conclude the discriminator is "does the shape have a real mesh" = `SolidType.VPhysics`,
+and ship a hybrid (TriggerBounds for VPhysics, BBOX for the rest). **That was disproven by real-world
+data**: the crash reproduced on maps whose triggers are *all* `SOLID_VPHYSICS` (real vcollide meshes).
+So the TriggerBounds serializer is broken for triggers *regardless* of SolidType — and since ~95% of
+real triggers are VPhysics, a SolidType-gated hybrid would still crash on almost all of them. SolidType
+is **not** the discriminator.
 
-- `SolidType.VPhysics` → `OVERLAY_TRIGGER_BOUNDS_BIT` — the engine has a mesh to serialize, renders
-  the exact brush outline safely.
-- anything else → `OVERLAY_BBOX_BIT` (0x4) — dispatches to a *different* engine overlay handler that
-  draws `GetCollisionBounds` (a clean AABB) and never enters the mesh-serializer in `FUN_01583a80`.
-
-This keeps the exact outline where it's safe and a box everywhere else, with no custom net messages —
-the engine still serializes and broadcasts everything. Residual risk: a VPhysics trigger with a
-*broken/empty* vcollide could still trip the serializer; that can only be confirmed with a live
-client (the crashdumps on hand predate any fix, so the VPhysics path was never disproven).
+So the plugin uses `OVERLAY_BBOX_BIT` (0x4) for **every** trigger. BBOX dispatches to a *different*
+engine overlay handler that draws `GetCollisionBounds` (a clean AABB) and never enters the
+mesh-serializer in `FUN_01583a80` — crash-proof for all triggers, no custom net messages (the engine
+still serializes and broadcasts). Tradeoff: BBOX is the axis-aligned bounding box, not the exact brush
+outline (identical for box-shaped triggers, which is most of them).
 
 The two functions take `(CBaseEntity* entity, uint64 bits)` and edit the entity's overlay set —
 which in the current build is a `CUtlHashMap` at `entity + 0x160`, **not** a plain integer field
