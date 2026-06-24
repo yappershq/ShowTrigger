@@ -27,24 +27,21 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
 {
     private const string ModuleId = "ShowTrigger";
 
-    // Per-trigger we pick the overlay bit by whether the trigger has a real collision MESH:
+    // BoundingBox (0x4) + Name (0x2) for ALL triggers. NOT TriggerBounds (0x2000).
     //
-    //   VPhysics trigger (has a vcollide mesh)  → TriggerBounds (0x2000) = the exact brush outline.
-    //   bbox / point trigger (no mesh)          → BoundingBox  (0x4)     = the AABB box (safe).
+    // The engine's TriggerBounds overlay path (FUN_01583a80, the trigger's DrawDebugGeometryOverlays)
+    // serializes the trigger's collision-shape MESH (`_DAT_0284be48 + 0x430`) into the per-client
+    // overlay net-buffer, and that serializer is broken for triggers in this CS2 build — it reads a
+    // garbage vertex count and copies from a NULL source with a negative size → SIGSEGV every frame
+    // while broadcasting to a client. This is NOT limited to mesh-less triggers: it reproduced on
+    // maps whose triggers are *all* SOLID_VPHYSICS (real vcollide meshes), so an earlier hybrid that
+    // kept TriggerBounds for VPhysics triggers would still crash on ~95% of real triggers. The
+    // discriminator is not SolidType — the whole TriggerBounds serializer is unsafe here.
     //
-    // Why the split: RE of the crashdump (FUN_01583a80, the trigger's DrawDebugGeometryOverlays)
-    // showed TriggerBounds makes the engine serialize the trigger's collision-shape MESH vertices
-    // (`_DAT_0284be48 + 0x430`) into the per-client overlay net-buffer. A shape with NO mesh
-    // (SOLID_BBOX/point) still has a shape entry, so the engine reads a garbage vertex count →
-    // copy with NULL source + negative size → SIGSEGV every frame while broadcasting. A
-    // SOLID_VPHYSICS shape genuinely has that mesh, so TriggerBounds renders it safely. BoundingBox
-    // dispatches to a *different* engine overlay handler (draws GetCollisionBounds) that never
-    // enters the mesh-serializer, so it's the crash-proof fallback for the mesh-less ones.
-    //
-    // Both OR in Name (0x2) for labels. Removal clears every bit we might have set.
-    private const ulong MeshOverlayBits = (ulong) (DebugOverlayBits.TriggerBounds | DebugOverlayBits.Name);
-    private const ulong BoxOverlayBits  = (ulong) (DebugOverlayBits.BoundingBox   | DebugOverlayBits.Name);
-    private const ulong AllOverlayBits   = MeshOverlayBits | BoxOverlayBits;
+    // BoundingBox dispatches to a *different* engine overlay handler that draws GetCollisionBounds
+    // (a clean AABB) and never enters that mesh-serializer, so it is crash-proof for every trigger.
+    // Tradeoff: the AABB box, not the exact brush outline (identical for box-shaped triggers).
+    private const ulong TriggerOverlayBits = (ulong) (DebugOverlayBits.BoundingBox | DebugOverlayBits.Name);
 
     // The two engine functions are resolved as the `call` (E8) targets inside CMD_ShowTriggers.
     // Offsets verified against the current build (two independent RE passes + objdump).
@@ -198,10 +195,9 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
 
         _triggers.Add(entity);
 
-        // If triggers are currently shown, light up the freshly-spawned one immediately
-        // (mesh triggers get TriggerBounds, mesh-less get the safe BBOX — see OverlayBitsFor).
+        // If triggers are currently shown, light up the freshly-spawned one immediately.
         if (_nativeReady && AnyEnabled() && entity.IsValid())
-            _addBits(entity.GetAbsPtr(), OverlayBitsFor(entity));
+            _addBits(entity.GetAbsPtr(), TriggerOverlayBits);
     }
 
     void IEntityListener.OnEntityDeleted(IBaseEntity entity)
@@ -265,20 +261,11 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
                 continue;
 
             if (on)
-                _addBits(ptr, OverlayBitsFor(trigger));
+                _addBits(ptr, TriggerOverlayBits);
             else
-                _removeBits(ptr, AllOverlayBits);   // clear whichever bit we set
+                _removeBits(ptr, TriggerOverlayBits);
         }
     }
-
-    /// <summary>
-    /// TriggerBounds (exact brush outline) for a trigger with a real collision mesh
-    /// (SolidType.VPhysics — a vcollide), BoundingBox (safe AABB box) for any without one.
-    /// Flagging TriggerBounds on a mesh-less trigger makes the engine's overlay serializer read a
-    /// garbage vertex count → server SIGSEGV; the box path avoids that. See the bit constants above.
-    /// </summary>
-    private static ulong OverlayBitsFor(IBaseEntity trigger)
-        => trigger.GetCollisionProperty()?.SolidType == SolidType.VPhysics ? MeshOverlayBits : BoxOverlayBits;
 
     private bool AnyEnabled()
     {
