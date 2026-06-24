@@ -42,6 +42,8 @@
     <!-- CommandCenter — register the !showtriggers client command (no perms). Contract only;
          the server core provides the runtime, so ExcludeAssets="runtime". -->
     <PackageReference Include="ModSharp.Sharp.Modules.CommandCenter.Shared" Version="$(ModSharpVersion)" PrivateAssets="all" ExcludeAssets="runtime" />
+    <!-- LocalizerManager — localized chat strings (locales/showtrigger.json). Contract only. -->
+    <PackageReference Include="ModSharp.Sharp.Modules.LocalizerManager.Shared" Version="$(ModSharpVersion)" PrivateAssets="all" ExcludeAssets="runtime" />
   </ItemGroup>
 
 </Project>

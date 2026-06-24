@@ -1,0 +1,14 @@
+{
+  "showtrigger.on": {
+    "en-us": "{{green}}[ShowTrigger]{{default}} Trigger zones {{green}}ON{{default}}."
+  },
+  "showtrigger.off": {
+    "en-us": "{{darkred}}[ShowTrigger]{{default}} Trigger zones {{darkred}}OFF{{default}}."
+  },
+  "showtrigger.console_hint": {
+    "en-us": "{{gold}}[ShowTrigger]{{default}} Type {{gold}}cl_debug_overlays_broadcast 1{{default}} in your console to see them."
+  },
+  "showtrigger.unavailable": {
+    "en-us": "{{darkred}}[ShowTrigger]{{default}} Unavailable — gamedata not resolved."
+  }
+}

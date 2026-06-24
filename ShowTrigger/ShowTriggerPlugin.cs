@@ -63,6 +63,8 @@ public sealed class ShowTriggerPlugin : IModSharpModule
 
     public void OnAllModulesLoaded()
     {
+        InterfaceBridge.Instance.InitLocalizer();
+
         foreach (var module in _serviceProvider.GetServices<IModule>())
             CallSafe(module, static m => m.OnAllSharpModulesLoaded(), "OnAllModulesLoaded");
 

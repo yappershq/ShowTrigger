@@ -8,10 +8,11 @@ namespace ShowTrigger;
 /// broadcast (<c>sv_debug_overlays_broadcast 1</c>) to a client that opted in
 /// (<c>cl_debug_overlays_broadcast 1</c>).
 ///
-/// Full enum transcribed from the engine definition (the <c>MPropertyFriendlyName</c> /
-/// <c>MPropertyDescription</c> metadata is preserved as XML docs). Values are stable engine
-/// constants. The one this plugin uses for trigger zones is <see cref="TriggerBounds"/> (0x2000) —
-/// the exact bit CS2's <c>showtriggers</c> command sets.
+/// Names/values RE-VERIFIED against the live CS2 libserver schema enumerator array (every entry
+/// read from the binary, not just transcribed). Two CS2 deltas vs the Source 1 enum: bit 0x20000000
+/// (old OVERLAY_WC_CHANGE_ENTITY) is unnamed/stripped, and <see cref="MinimalText"/> (0x20000000000)
+/// is new. The one this plugin uses for trigger zones is <see cref="TriggerBounds"/> (0x2000) — the
+/// exact bit CS2's <c>showtriggers</c> command sets.
 /// </summary>
 [Flags]
 public enum DebugOverlayBits : ulong
@@ -75,8 +76,7 @@ public enum DebugOverlayBits : ulong
     NpcViewcone = 0x8000000,
     /// <summary>"NPC Kill" — kill the NPC, running all appropriate AI.</summary>
     NpcKill = 0x10000000,
-    /// <summary>"OVERLAY_WC_CHANGE_ENTITY" — object changed during WC edit.</summary>
-    WcChangeEntity = 0x20000000,
+    // 0x20000000 exists but is unnamed in CS2's schema (Source 1's OVERLAY_WC_CHANGE_ENTITY was stripped).
     /// <summary>"Buddha Mode" — take damage but don't die.</summary>
     BuddhaMode = 0x40000000,
     /// <summary>"NPC Steering" — steering regulations associated with the NPC.</summary>
@@ -99,4 +99,6 @@ public enum DebugOverlayBits : ulong
     NpcConditionsText = 0x8000000000,
     /// <summary>"NPC Ability Ranges".</summary>
     NpcAbilityRangeDebug = 0x10000000000,
+    /// <summary>"Minimal Text" — CS2 addition (not in the Source 1 enum).</summary>
+    MinimalText = 0x20000000000,
 }

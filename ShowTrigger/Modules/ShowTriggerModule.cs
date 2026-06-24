@@ -204,7 +204,7 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
     {
         if (!_nativeReady)
         {
-            client.Print(HudPrintChannel.Chat, " \x02[ShowTrigger]\x01 Unavailable — gamedata not resolved.");
+            client.Print(HudPrintChannel.Chat, _bridge.Localize(client, "showtrigger.unavailable"));
             return;
         }
 
@@ -214,13 +214,10 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
 
         ApplyBits(AnyEnabled());
 
-        client.Print(HudPrintChannel.Chat,
-            on ? " \x04[ShowTrigger]\x01 Trigger zones \x04ON\x01."
-               : " \x02[ShowTrigger]\x01 Trigger zones \x02OFF\x01.");
+        client.Print(HudPrintChannel.Chat, _bridge.Localize(client, on ? "showtrigger.on" : "showtrigger.off"));
 
         if (on)
-            client.Print(HudPrintChannel.Chat,
-                " \x10[ShowTrigger]\x01 Type \x10cl_debug_overlays_broadcast 1\x01 in console to see them.");
+            client.Print(HudPrintChannel.Chat, _bridge.Localize(client, "showtrigger.console_hint"));
     }
 
     // ===== IClientListener: per-player cleanup =====
