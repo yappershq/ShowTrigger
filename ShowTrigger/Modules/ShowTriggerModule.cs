@@ -27,13 +27,14 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
 {
     private const string ModuleId = "ShowTrigger";
 
-    // BoundingBox (0x4) + Name (0x2). We do NOT use TriggerBounds (0x2000, what the engine's own
-    // `showtriggers` uses): RE of a server crashdump showed the trigger's DrawDebugGeometryOverlays
-    // (vtable[0x20]) crashes (SIGSEGV) in the trigger-bounds *brush-geometry* net-serialization —
-    // a write with a negative size from degenerate bounds on some trigger — every frame while the
-    // overlays are broadcast to a client. The BBOX branch serializes the entity AABB (always valid),
-    // avoiding that path. This is also what CS:GO's showtriggers / CS2Surf used.
-    private const ulong TriggerOverlayBits = (ulong) (DebugOverlayBits.BoundingBox | DebugOverlayBits.Name);
+    // TriggerBounds (0x2000) — the real trigger-brush outline (what the engine's `showtriggers`
+    // draws) + Name (0x2) for labels. The crash this used to cause is handled by ONLY flagging
+    // triggers that have a real collision mesh (see HasCollisionMesh): RE of the crashdump showed
+    // the trigger's DrawDebugGeometryOverlays serializes the collision-MESH vertices, and for a
+    // trigger with no vcollide (AABB/point triggers) the vertex count is garbage → null/negative
+    // -size copy → SIGSEGV every frame while broadcasting. VPhysics triggers have a valid mesh and
+    // render safely, so we flag only those — keeping the proper trigger-bounds render, no crash.
+    private const ulong TriggerOverlayBits = (ulong) (DebugOverlayBits.TriggerBounds | DebugOverlayBits.Name);
 
     // The two engine functions are resolved as the `call` (E8) targets inside CMD_ShowTriggers.
     // Offsets verified against the current build (two independent RE passes + objdump).
@@ -187,8 +188,9 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
 
         _triggers.Add(entity);
 
-        // If triggers are currently shown, light up the freshly-spawned one immediately.
-        if (_nativeReady && AnyEnabled() && entity.IsValid())
+        // If triggers are currently shown, light up the freshly-spawned one immediately
+        // (mesh-less triggers are skipped — see HasCollisionMesh).
+        if (_nativeReady && AnyEnabled() && entity.IsValid() && HasCollisionMesh(entity))
             _addBits(entity.GetAbsPtr(), TriggerOverlayBits);
     }
 
@@ -253,11 +255,25 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
                 continue;
 
             if (on)
-                _addBits(ptr, TriggerOverlayBits);
+            {
+                if (HasCollisionMesh(trigger))     // skip mesh-less triggers — they crash the serializer
+                    _addBits(ptr, TriggerOverlayBits);
+            }
             else
+            {
                 _removeBits(ptr, TriggerOverlayBits);
+            }
         }
     }
+
+    /// <summary>
+    /// True only for triggers with a real collision mesh (SolidType.VPhysics — a vcollide from the
+    /// model). The engine's trigger-bounds overlay serializes that mesh's vertices; flagging a
+    /// trigger without one (AABB/point triggers) feeds a degenerate vertex count into the net-buffer
+    /// copy → null source + negative size → server SIGSEGV. So we only flag VPhysics triggers.
+    /// </summary>
+    private static bool HasCollisionMesh(IBaseEntity trigger)
+        => trigger.GetCollisionProperty()?.SolidType == SolidType.VPhysics;
 
     private bool AnyEnabled()
     {
