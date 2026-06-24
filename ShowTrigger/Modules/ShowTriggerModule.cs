@@ -27,10 +27,13 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
 {
     private const string ModuleId = "ShowTrigger";
 
-    // The EXACT value the engine's own CMD_ShowTriggers passes (verified in libserver disasm:
-    // `mov $0x2000,%esi` right before the Add/Remove call). OR in DebugOverlayBits.Name if you
-    // also want the trigger's name drawn.
-    private const ulong TriggerOverlayBits = (ulong) DebugOverlayBits.TriggerBounds;
+    // BoundingBox (0x4) + Name (0x2). We do NOT use TriggerBounds (0x2000, what the engine's own
+    // `showtriggers` uses): RE of a server crashdump showed the trigger's DrawDebugGeometryOverlays
+    // (vtable[0x20]) crashes (SIGSEGV) in the trigger-bounds *brush-geometry* net-serialization —
+    // a write with a negative size from degenerate bounds on some trigger — every frame while the
+    // overlays are broadcast to a client. The BBOX branch serializes the entity AABB (always valid),
+    // avoiding that path. This is also what CS:GO's showtriggers / CS2Surf used.
+    private const ulong TriggerOverlayBits = (ulong) (DebugOverlayBits.BoundingBox | DebugOverlayBits.Name);
 
     // The two engine functions are resolved as the `call` (E8) targets inside CMD_ShowTriggers.
     // Offsets verified against the current build (two independent RE passes + objdump).
