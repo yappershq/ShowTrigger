@@ -36,19 +36,24 @@ Full detail incl. the RE: [docs/MECHANISM.md](docs/MECHANISM.md).
 
 ```bash
 cd ShowTrigger
-dotnet build -c Release          # if `version` env is exported as N/A: `env -u version dotnet build -c Release`
+dotnet build -c Release
 ```
 
 Outputs `.build/modules/ShowTrigger/ShowTrigger.dll` and `.build/gamedata/showtrigger.jsonc`.
 
 ## Deploy
 
-```bash
-modsharp-deploy . <server-profile> --no-restart
-```
+Copy the build output into your ModSharp install (`<sharp>` = your `sharp` directory, e.g.
+`game/csgo/addons/sharp`):
 
-Ships the module to `/game/sharp/modules/ShowTrigger/` and the gamedata to
-`/game/sharp/gamedata/showtrigger.jsonc`. No config file. Restart (or mapchange) to load.
+| From | To |
+|---|---|
+| `.build/modules/ShowTrigger/` | `<sharp>/modules/ShowTrigger/` |
+| `.build/gamedata/showtrigger.jsonc` | `<sharp>/gamedata/showtrigger.jsonc` |
+| `.build/locales/showtrigger.json` | `<sharp>/locales/showtrigger.json` |
+
+No config file. Restart the server (or change map) to load. CommandCenter + LocalizerManager must be
+installed (they ship with ModSharp).
 
 ## If it breaks after a game update
 
