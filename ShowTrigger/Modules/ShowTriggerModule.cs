@@ -29,8 +29,12 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
     private const ulong TriggerOverlayBits = 0x2000UL;
 
     // The two engine functions are resolved as the `call` (E8) targets inside CMD_ShowTriggers.
-    // These byte offsets match the current build (verified by RE); the opcode is asserted at load,
-    // so a future offset drift fails loudly instead of calling into garbage.
+    // Offsets verified against the current build (two independent RE passes + objdump).
+    //
+    // Add vs Remove direction is NOT guessed: CMD_ShowTriggers branches on
+    // `V_atoi(argv[1]) != 0` (default 1) — i.e. `showtriggers 1` (show) takes the +120 call and
+    // `showtriggers 0` (hide) takes +196. So +120 = Add (set bits), +196 = Remove (clear bits).
+    // The opcode is asserted at load, so a future offset drift fails loudly, not silently.
     private const int AddCallOffset    = 120;
     private const int RemoveCallOffset = 196;
 
