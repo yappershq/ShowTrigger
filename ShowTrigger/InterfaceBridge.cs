@@ -11,10 +11,11 @@ internal sealed class InterfaceBridge
     internal string SharpPath { get; }
     internal string DllPath   { get; }
 
-    internal IModSharp       ModSharp       { get; }
-    internal IClientManager  ClientManager  { get; }
-    internal IEntityManager  EntityManager  { get; }
-    internal ILoggerFactory  LoggerFactory  { get; }
+    internal IModSharp           ModSharp           { get; }
+    internal IClientManager      ClientManager      { get; }
+    internal IEntityManager      EntityManager      { get; }
+    internal ISharpModuleManager SharpModuleManager { get; }
+    internal ILoggerFactory      LoggerFactory      { get; }
 
     public InterfaceBridge(string dllPath, string sharpPath, ISharedSystem sharedSystem, ILoggerFactory loggerFactory)
     {
@@ -23,9 +24,10 @@ internal sealed class InterfaceBridge
         SharpPath = sharpPath;
         DllPath   = dllPath;
 
-        ModSharp      = sharedSystem.GetModSharp();
-        ClientManager = sharedSystem.GetClientManager();
-        EntityManager = sharedSystem.GetEntityManager();
-        LoggerFactory = loggerFactory;
+        ModSharp           = sharedSystem.GetModSharp();
+        ClientManager      = sharedSystem.GetClientManager();
+        EntityManager      = sharedSystem.GetEntityManager();
+        SharpModuleManager = sharedSystem.GetSharpModuleManager();
+        LoggerFactory      = loggerFactory;
     }
 }

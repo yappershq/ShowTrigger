@@ -39,6 +39,9 @@
 
   <ItemGroup>
     <PackageReference Include="ModSharp.Sharp.Shared" Version="$(ModSharpVersion)" PrivateAssets="all" ExcludeAssets="runtime" />
+    <!-- CommandCenter — register the !showtriggers client command (no perms). Contract only;
+         the server core provides the runtime, so ExcludeAssets="runtime". -->
+    <PackageReference Include="ModSharp.Sharp.Modules.CommandCenter.Shared" Version="$(ModSharpVersion)" PrivateAssets="all" ExcludeAssets="runtime" />
   </ItemGroup>
 
 </Project>

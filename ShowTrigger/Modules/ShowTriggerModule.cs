@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Sharp.Modules.CommandCenter.Shared;
 using Sharp.Shared.Enums;
 using Sharp.Shared.GameEntities;
 using Sharp.Shared.Listeners;
 using Sharp.Shared.Objects;
+using Sharp.Shared.Types;
 
 namespace ShowTrigger.Modules;
 
@@ -23,10 +25,12 @@ namespace ShowTrigger.Modules;
 /// </summary>
 internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClientListener, IGameListener
 {
-    // OVERLAY_TRIGGER_BOUNDS_BIT (0x2000) — the EXACT value the engine's own CMD_ShowTriggers
-    // passes (verified in libserver disasm: `mov $0x2000,%esi` right before the Add/Remove call).
-    // OR in OVERLAY_NAME_BIT (0x2) here if you also want the trigger's name drawn.
-    private const ulong TriggerOverlayBits = 0x2000UL;
+    private const string ModuleId = "ShowTrigger";
+
+    // The EXACT value the engine's own CMD_ShowTriggers passes (verified in libserver disasm:
+    // `mov $0x2000,%esi` right before the Add/Remove call). OR in DebugOverlayBits.Name if you
+    // also want the trigger's name drawn.
+    private const ulong TriggerOverlayBits = (ulong) DebugOverlayBits.TriggerBounds;
 
     // The two engine functions are resolved as the `call` (E8) targets inside CMD_ShowTriggers.
     // Offsets verified against the current build (two independent RE passes + objdump).
@@ -105,6 +109,27 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
         {
             _logger.LogError(e, "[ShowTrigger] gamedata load failed — feature disabled");
         }
+
+        RegisterCommands();
+    }
+
+    private void RegisterCommands()
+    {
+        // CommandCenter, no permission gate: !showtriggers / .showtriggers / /showtriggers in chat,
+        // and ms_showtriggers in client console (the ms_ prefix is added automatically).
+        var commandCenter = _bridge.SharpModuleManager
+            .GetOptionalSharpModuleInterface<ICommandCenter>(ICommandCenter.Identity)?.Instance;
+
+        if (commandCenter is null)
+        {
+            _logger.LogWarning("[ShowTrigger] CommandCenter not present — !showtriggers unavailable");
+            return;
+        }
+
+        var registry = commandCenter.GetRegistry(ModuleId);
+        registry.RegisterClientCommand("showtriggers", OnShowTriggerCommand);
+        registry.RegisterClientCommand("showtrigger",  OnShowTriggerCommand);
+        registry.RegisterClientCommand("st",           OnShowTriggerCommand);
     }
 
     public void Shutdown()
@@ -173,21 +198,14 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
     private static bool IsTrigger(IBaseEntity e)
         => e.Classname is { Length: > 0 } c && c.StartsWith("trigger_", StringComparison.Ordinal);
 
-    // ===== IClientListener: the toggle command =====
+    // ===== the toggle command (CommandCenter, no perms) =====
 
-    ECommandAction IClientListener.OnClientSayCommand(
-        IGameClient client, bool teamOnly, bool isCommand, string commandName, string message)
+    private void OnShowTriggerCommand(IGameClient client, StringCommand command)
     {
-        var msg = message.Trim();
-        if (!msg.Equals("!showtriggers", StringComparison.OrdinalIgnoreCase)
-            && !msg.Equals("!showtrigger", StringComparison.OrdinalIgnoreCase)
-            && !msg.Equals("!st", StringComparison.OrdinalIgnoreCase))
-            return ECommandAction.Skipped;
-
         if (!_nativeReady)
         {
             client.Print(HudPrintChannel.Chat, " \x02[ShowTrigger]\x01 Unavailable — gamedata not resolved.");
-            return ECommandAction.Handled;
+            return;
         }
 
         var slot = client.Slot.AsPrimitive();
@@ -203,9 +221,9 @@ internal sealed unsafe class ShowTriggerModule : IModule, IEntityListener, IClie
         if (on)
             client.Print(HudPrintChannel.Chat,
                 " \x10[ShowTrigger]\x01 Type \x10cl_debug_overlays_broadcast 1\x01 in console to see them.");
-
-        return ECommandAction.Handled;
     }
+
+    // ===== IClientListener: per-player cleanup =====
 
     void IClientListener.OnClientDisconnected(IGameClient client, NetworkDisconnectionReason reason)
     {

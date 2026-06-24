@@ -9,14 +9,17 @@ current game build.
 
 ## Usage
 
-In chat: **`!showtriggers`** (aliases `!showtrigger`, `!st`) — toggles trigger zones for you.
+**`!showtriggers`** (aliases `!showtrigger`, `!st`) — toggles trigger zones for you. Registered via
+CommandCenter with **no permission gate**: works in chat (`!` / `.` / `/`) and in the client console
+as `ms_showtriggers`.
 
 When you turn it on it reminds you to run **`cl_debug_overlays_broadcast 1`** in your own console —
 that client cvar is what actually renders the broadcast overlays, and it can't be forced from the
 server (see Mechanism).
 
-The overlay drawn is `OVERLAY_TRIGGER_BOUNDS_BIT` (`0x2000`) — the exact bit the engine's own
-`showtriggers` uses (verified in the disassembly). OR in `OVERLAY_NAME_BIT` (`0x2`) via
+The overlay drawn is `DebugOverlayBits.TriggerBounds` (`0x2000`) — the exact bit the engine's own
+`showtriggers` uses (verified in the disassembly). The full engine overlay-bit enum lives in
+[`DebugOverlayBits.cs`](ShowTrigger/DebugOverlayBits.cs); OR in `DebugOverlayBits.Name` via
 `TriggerOverlayBits` in [`ShowTriggerModule.cs`](ShowTrigger/Modules/ShowTriggerModule.cs) if you
 also want trigger names drawn.
 
