@@ -1,0 +1,24 @@
+{
+  // ShowTrigger gamedata. Registered by name "showtrigger" → /game/sharp/gamedata/showtrigger.jsonc.
+  //
+  // We only sign CMD_ShowTriggers (the engine's `showtriggers` console-command handler) because it
+  // is the only UNIQUE anchor. The two functions we actually call —
+  //   AddDebugOverlayBits(CBaseEntity*, bits)  and  RemoveDebugOverlayBits(CBaseEntity*, bits)
+  // — are reached through non-unique trampolines, so a standalone sig is ambiguous. Instead the
+  // plugin resolves them at load as the `call` (E8) targets inside CMD_ShowTriggers, at offsets
+  // +120 (Add) and +196 (Remove). Those offsets are verified against the current build; the plugin
+  // asserts the E8 opcode at each, so a future drift disables the feature loudly rather than
+  // calling into garbage. If it ever breaks after a game update: re-sig CMD_ShowTriggers and
+  // re-confirm the two call offsets (see docs/MECHANISM.md).
+  //
+  // RE notes (current build): CMD_ShowTriggers RVA 0x1938260; +120 → Add trampoline 0xc81d40;
+  // +196 → Remove trampoline 0xc81d80. Both write the entity's m_debugOverlays CUtlHashMap at
+  // entity+0x160 (NOT a plain bitfield — hence the native calls, not a schema write).
+  "Addresses": {
+    "CMD_ShowTriggers": {
+      "library": "server",
+      "linux": "55 48 89 E5 41 57 41 56 41 BE ? ? ? ? 41 55 41 54 53 48 83 EC 28 83 BE 38",
+      "windows": ""
+    }
+  }
+}
